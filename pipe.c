@@ -17,6 +17,10 @@ struct pipe {
   uint nwrite;    // number of bytes written
   int readopen;   // read fd is still open
   int writeopen;  // write fd is still open
+  int write_id;
+  int special_write_id;
+  int special_write_flag;
+  int future_nwrite;
 };
 
 int
@@ -34,6 +38,8 @@ pipealloc(struct file **f0, struct file **f1)
   p->writeopen = 1;
   p->nwrite = 0;
   p->nread = 0;
+  p->write_id = 0;
+  p->special_write_flag = 0;
   initlock(&p->lock, "pipe");
   (*f0)->type = FD_PIPE;
   (*f0)->readable = 1;
@@ -79,6 +85,7 @@ int
 pipewrite(struct pipe *p, char *addr, int n)
 {
   int i;
+  int id = p->write_id++;
 
   acquire(&p->lock);
   for(i = 0; i < n; i++){
@@ -88,9 +95,22 @@ pipewrite(struct pipe *p, char *addr, int n)
         return -1;
       }
       wakeup(&p->nread);
-      sleep(&p->nwrite, &p->lock);  //DOC: pipewrite-sleep
+      if (!p->special_write_flag || id == p->special_write_id) {
+          sleep(&p->nwrite, &p->lock);
+      } else {
+          sleep(&p->future_nwrite, &p->lock);
+      }
     }
     p->data[p->nwrite++ % PIPESIZE] = addr[i];
+    if (n < PIPESIZE && !p->special_write_flag && i < n - 1) {
+        p->special_write_flag = 1;
+        p->special_write_id = id;
+        p->future_nwrite = p->nwrite + n - i - 1;
+    }
+  }
+  if (p->special_write_flag || id == p->special_write_id) {
+      p->special_write_flag = 0;
+      wakeup(&p->future_nwrite);
   }
   wakeup(&p->nread);  //DOC: pipewrite-wakeup1
   release(&p->lock);
