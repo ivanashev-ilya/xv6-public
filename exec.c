@@ -7,6 +7,8 @@
 #include "x86.h"
 #include "elf.h"
 
+#define MAX_LENGTH 1024
+
 int
 exec(char *path, char **argv)
 {
@@ -18,6 +20,7 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pde_t *pgdir, *oldpgdir;
   struct proc *curproc = myproc();
+  char *extended_argv[MAXARG];
 
   begin_op();
 
@@ -26,6 +29,23 @@ exec(char *path, char **argv)
     cprintf("exec: fail\n");
     return -1;
   }
+  
+  char script[MAX_LENGTH];
+  int length = readi(ip, script, 0, MAX_LENGTH);
+  if (length >= 2 && script[0] == '#' && script[1] == '!') {
+      int i;
+      for (i = 2; i < length && script[i] != ' ' && script[i] != '\n'; ++i) {
+          script[i - 2] = script[i];
+      }
+      script[i - 2] = '\0';
+      extended_argv[0] = path;
+      for (i = 0; argv[i] != 0; ++i) {
+          extended_argv[i + 1] = argv[i];
+      }
+      extended_argv[i + 1] = 0;
+      return exec(script, extended_argv);
+  }
+  
   ilock(ip);
   pgdir = 0;
 
