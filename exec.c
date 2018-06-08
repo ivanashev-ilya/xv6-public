@@ -7,7 +7,7 @@
 #include "x86.h"
 #include "elf.h"
 
-#define MAX_LENGTH 1024
+#define BINPRM_BUF_SIZE 128
 
 int
 exec(char *path, char **argv)
@@ -30,16 +30,17 @@ exec(char *path, char **argv)
     return -1;
   }
   
-  char script[MAX_LENGTH];
-  int length = readi(ip, script, 0, MAX_LENGTH);
+  char script[BINPRM_BUF_SIZE];
+  int length = readi(ip, script, 0, BINPRM_BUF_SIZE);
   if (length >= 2 && script[0] == '#' && script[1] == '!') {
       int i;
       for (i = 2; i < length && script[i] != ' ' && script[i] != '\n'; ++i) {
           script[i - 2] = script[i];
       }
       script[i - 2] = '\0';
-      extended_argv[0] = path;
-      for (i = 0; argv[i] != 0; ++i) {
+      extended_argv[0] = script;
+      extended_argv[1] = path;
+      for (i = 1; argv[i] != 0; ++i) {
           extended_argv[i + 1] = argv[i];
       }
       extended_argv[i + 1] = 0;
