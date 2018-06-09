@@ -89,7 +89,7 @@ pipewrite(struct pipe *p, char *addr, int n)
 
   acquire(&p->lock);
   for(i = 0; i < n; i++){
-    while(p->nwrite == p->nread + PIPESIZE){  //DOC: pipewrite-full
+    while(p->nwrite == p->nread + PIPESIZE || (p->special_write_flag && id != p->special_write_id)){  //DOC: pipewrite-full
       if(p->readopen == 0 || myproc()->killed){
         release(&p->lock);
         return -1;
