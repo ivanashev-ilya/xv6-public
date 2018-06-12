@@ -8,9 +8,10 @@
 #include "elf.h"
 
 #define BINPRM_BUF_SIZE 128
+#define MAX_DEPTH 128
 
 int
-exec(char *path, char **argv)
+depth_exec(char *path, char **argv, int depth)
 {
   char *s, *last;
   int i, off;
@@ -23,8 +24,8 @@ exec(char *path, char **argv)
   char *extended_argv[MAXARG];
 
   begin_op();
-
-  if((ip = namei(path)) == 0){
+  
+  if((ip = namei(path)) == 0 || depth > MAX_DEPTH){
     end_op();
     cprintf("exec: fail\n");
     return -1;
@@ -44,7 +45,7 @@ exec(char *path, char **argv)
           extended_argv[i + 1] = argv[i];
       }
       extended_argv[i + 1] = 0;
-      return exec(script, extended_argv);
+      return depth_exec(script, extended_argv, ++depth);
   }
   
   ilock(ip);
@@ -132,4 +133,10 @@ exec(char *path, char **argv)
     end_op();
   }
   return -1;
+}
+
+int
+exec(char *path, char **argv)
+{
+    return depth_exec(path, argv, 0);
 }
